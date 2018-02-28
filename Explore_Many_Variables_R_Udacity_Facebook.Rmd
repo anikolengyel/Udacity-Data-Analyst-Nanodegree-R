@@ -1,0 +1,234 @@
+---
+title: "Explore_Many_Variables_R_Udacity"
+author: "Aniko Lengyel"
+output: html_document
+---
+
+During my tasks, I analyzed Udacity's pseudo-Facebook data based on the course
+instructions. I used an rmd file to show and track the whole analyzis process.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+library(ggplot2)
+library(gridExtra)
+library(GGally)
+library(doBy)
+library(corrplot)
+```
+
+I red in the dataset and looked at the strucure.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+pf <- read.csv('pseudo_facebook.tsv', sep = '\t')
+names(pf)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+head(pf)
+
+```
+
+I created a new data frame, called 'pf.fc_by_age_gender', that 
+contains information on each age and gender group, including the following 
+variables:
+
+- mean_friend_count,
+- median_friend_count,
+- n (the number of users in each age and gender grouping)
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+users_by_age_and_gender <- group_by(pf, age, gender)
+pf.fc_by_age_gender<-summarise(users_by_age_and_gender,
+                               mean_friend_count = mean(friend_count),
+                               median_friend_count = median(friend_count),
+                               n = n())
+
+names(users_by_age_and_gender)
+
+
+```
+
+ I created a line graph to show the median friend count over the ages for each 
+ gender in the pf.fc_by_age_gender data frame.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+ggplot(aes(x = age, y = median_friend_count), 
+       data = subset(pf.fc_by_age_gender, !is.na(gender)))+
+  geom_line(aes(color = gender), stat = "summary")
+
+```
+
+Using package "tidyr".
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+spread(subset(pf.fc_by_age_gender, 
+              select = c('gender', 'age', 'median_friend_count')), 
+       gender, median_friend_count)
+
+```
+
+I reshaped the data with dcast function, and excluded the records where there is 
+no data about the genders. I also created a new dataframe, named 
+pf.fc_by_age_gender.wide.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+pf.fc_by_age_gender.wide <- dcast(subset(pf.fc_by_age_gender, !is.na(gender)), 
+                                  age ~ gender,
+                                  value.var = 'median_friend_count')
+
+head(pf.fc_by_age_gender.wide)
+
+
+```
+
+I plotted the ratio of the female to male median friend counts and added a 
+horizontal line to the plot with a y intercept and made it dashed. I arranged
+the plots to get two diagram based on gender.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+ggplot(aes(x = age, y = female/ male), 
+       data = pf.fc_by_age_gender.wide)+
+  geom_hline(yintercept=1, linetype = 2, alpha = 0.3)+
+  geom_line()
+
+female_plot <- ggplot(aes(x = age, y = female), data = pf.fc_by_age_gender.wide)+
+  geom_hline(yintercept=1, linetype = 2)+
+  geom_line(stat = "summary")
+
+male_plot <- ggplot(aes(x = age, y = male), data = pf.fc_by_age_gender.wide)+
+  geom_hline(yintercept=1, linetype = 2)+
+  geom_line
+
+grid.arrange(female_plot, male_plot)
+
+```
+
+I created a new variable, called year_joined in the pf data frame using the variable
+tenure. 2014 is the last year.
+
+According to the instructions, the variable year_joined had to contain the year 
+that a user joined facebook.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+pf$year_joined <- floor(2014 - pf$tenure/365)
+
+summary(pf$year_joined)
+
+```
+
+Doublecheking the numbers of users joined in each year.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+table(pf$year_joined)
+
+```
+
+I created a new variable in the data frame called year_joined.bucket by using
+the cut function on the variable year_joined.
+
+I had to create the following buckets for the new variable, year_joined.bucket.
+
+        (2004, 2009]
+        (2009, 2011]
+        (2011, 2012]
+        (2012, 2014]
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+pf$year_joined.bucket <- cut(pf$year_joined, c(2004, 2009, 2011, 2012, 2014))
+
+
+```
+
+I had to create a line graph of friend_count vs. age so that each year_joined.bucket 
+is a line tracking the median user friend_count across age.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+ggplot(aes(x = age, y = friend_count), 
+       data = subset(pf, !is.na(year_joined)))+
+  geom_line(aes(color = year_joined.bucket), stat = "summary", fun.y = median)
+
+```
+
+After that I followed the instructions below:
+
+(1) Add another geom_line to code below to plot the grand mean of the friend 
+count vs age.
+
+(2) Exclude any users whose year_joined.bucket is NA.
+
+(3) Use a different line type for the grand mean.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+ggplot(aes(x = age, y = friend_count), 
+       data = subset(pf, !is.na(year_joined)))+
+  geom_line(aes(color = year_joined.bucket), stat = "summary", fun.y = mean)+
+  geom_line(stat = 'summary', fun.y = mean, linetype = 2)
+
+with(subset(pf, tenure >= 1), summary(friend_count / tenure))
+
+```
+
+I created a graph of mean of friendships_initiated per day (of tenure)
+vs. tenure colored by year_joined.bucket. I exluded the users with less than
+one day of tenure.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+ggplot(aes(x = tenure, y = friendships_initiated / tenure), 
+       data = subset(pf, tenure >= 1)) +
+  geom_line(aes(color = year_joined.bucket))
+
+```
+
+I limited the y axis to get a better readable diagram.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+ggplot(aes(x = tenure, y = friendships_initiated / tenure), 
+       data = subset(pf, tenure >= 1)) +
+  geom_line(aes(color = year_joined.bucket)) +
+              scale_y_continuous(limits = c(0, 25))
+
+```
+
+I used geom_smooth() to add a smoother line to the plot.
+You can use the defaults for geom_smooth() but do color the line
+by year_joined.bucket. I named the x, y axis and gave a title.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+final_plot <- ggplot(aes(x = 7 * round(tenure / 7), y = friendships_initiated / tenure),
+       data = subset(pf, tenure > 0)) +
+  geom_smooth(aes(color = year_joined.bucket)) +
+  xlab('Tenure (Day)') +
+  ylab('Frienships Initiated') +
+  ggtitle('Friendships Initiated per Day (Tenure)')
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+
+
+```
